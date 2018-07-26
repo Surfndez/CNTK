@@ -19,7 +19,7 @@ DIM_SIZE_FOR_NON_BATCH_OPS = 1
 # When adding a test for a new op, please check to see if 
 # that op needs to be added to this list (i.e. does that op 
 # get exported to an ONNX op with defined batch axis).
-set_of_batch_ops = {'Pooling', 'Convolution', 'GlobalAveragePooling', 'GlobalMaxPooling', 'DepthToSpace', 'SpaceToDepth', 'LocalResponseNormalization', 'MeanVarianceNormalization', 'LayerNormalization'}
+set_of_batch_ops = {'Pooling', 'Convolution', 'GlobalAveragePooling', 'GlobalMaxPooling', 'DepthToSpace', 'SpaceToDepth', 'LocalResponseNormalization', 'MeanVarianceNormalization', 'LayerNormalization', 'BatchNormalization'}
 
 #############
 #helpers
@@ -248,7 +248,6 @@ def test_AveragePool(tmpdir, dtype, device_id):
 #BatchNormalization
 @pytest.mark.parametrize("dtype", DType_Config)
 def test_BatchNormalization(tmpdir, dtype):
-    pytest.skip('Needs to be fixed after removal of batch axis change.')
     if (dtype == np.float16):
         pytest.skip("TO BE FIXED")
     with C.default_options(dtype = dtype):
@@ -273,7 +272,7 @@ def test_BatchNormalization(tmpdir, dtype):
         run_variance = C.ops.constant(var,  shape=(1), dtype=dtype)
         run_count    = C.ops.constant(0,               dtype=dtype)
 
-        a = C.input_variable(shape=(1), dtype=dtype, needs_gradient=False, name='a')
+        a = C.input_variable(shape=t.shape, dtype=dtype, needs_gradient=False, name='a')
 
         op_node = C.batch_normalization(a, scale, bias, run_mean, run_variance, running_count=run_count, spatial=False,
             epsilon=epsilon)

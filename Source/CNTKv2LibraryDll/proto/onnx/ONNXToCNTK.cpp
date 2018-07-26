@@ -2126,11 +2126,14 @@ FunctionPtr ONNXToCNTKHelper::CreateFunction(const Node *node, const std::vector
     }
     else if (onnxOpName == "BatchNormalization" || onnxOpName == "SpatialBN")
     {
-        const Variable &operand = inputs[0];
-        const Variable &scale = inputs[1];
-        const Variable &bias = inputs[2];
-        const Variable &runningMean = inputs[3];
-        const Variable &runningInvStd = inputs[4];
+        auto operandPlaceholder = PlaceholderVariable(inputs[0].Shape(), L"operand", {});
+        const Variable& operandWithBatchAxis = ToBatch(operandPlaceholder);
+
+        const Variable &operand = (operandWithBatchAxis.IsInitialized()) ? operandWithBatchAxis : inputs[0];
+        const Variable &scale = PlaceholderVariable(inputs[1].Shape(), inputs[1].Name(), {});
+        const Variable &bias = PlaceholderVariable(inputs[2].Shape(), inputs[2].Name(), {});;
+        const Variable &runningMean = PlaceholderVariable(inputs[3].Shape(), inputs[3].Name(), {});;
+        const Variable &runningInvStd = PlaceholderVariable(inputs[4].Shape(), inputs[4].Name(), {});;
         const Variable &runningCount = Constant::Scalar(0.0F);
 
         bool spatial = onnxOpName == "SpatialBN" || GetNamedAttributeAsInt64(node, "spatial", 1) != 0;
@@ -2148,7 +2151,7 @@ FunctionPtr ONNXToCNTKHelper::CreateFunction(const Node *node, const std::vector
         // TODO: avoid hardcoded values
         double blendTimeConstant = 0;
         double epsilon = static_cast<double>(GetNamedAttributeAsFloat(node, "epsilon", 0.00001f));
-        bool useCuDNNEngine = true;
+        bool useCuDNNEngine = false;
         if ((epsilon < (0.00001f - std::numeric_limits<float>::epsilon())))
         {
             // REVIEW SPTIWARI: We are leaving some buffer in comparing with 1e-5 in the "if" condition above,
@@ -2162,7 +2165,7 @@ FunctionPtr ONNXToCNTKHelper::CreateFunction(const Node *node, const std::vector
             useCuDNNEngine = false;
         }
         bool disableRegularization = false;
-        FunctionPtr cntkFunction = BatchNormalization(operand,
+        FunctionPtr cntkFunctionWithBatchAxis = BatchNormalization(operand,
                                                       scale,
                                                       bias,
                                                       runningMean,
@@ -2175,7 +2178,17 @@ FunctionPtr ONNXToCNTKHelper::CreateFunction(const Node *node, const std::vector
                                                       useCuDNNEngine,
                                                       disableRegularization,
                                                       ToFixedWStringFromMultiByte(node->Name()));
-        return cntkFunction;
+
+        FunctionPtr cntkFunctionWithStaticAxis = UnpackBatch(cntkFunctionWithBatchAxis, ToFixedWStringFromMultiByte(node->Name()));
+        vector<pair<Variable, Variable>> argsMap{
+            {operandPlaceholder, inputs[0]},
+            {scale, inputs[1]},
+            {bias, inputs[2]},
+            {runningMean, inputs[3]},
+            {runningInvStd, inputs[4]},
+        };
+        return AsBlock(std::move(cntkFunctionWithStaticAxis), argsMap,
+            cntkFunctionWithBatchAxis->OpName(), ToFixedWStringFromMultiByte(node->Name()));
     }
     else if (onnxOpName == "Gemm")
     {
