@@ -1023,17 +1023,23 @@ def test_Pad(tmpdir, dtype):
 @pytest.mark.parametrize("dtype", DType_Config)
 def test_PRelu(tmpdir, dtype):
     # no input
-    data = np.asarray([[-1, -0.5, 0, 1, 2]])
-    alpha = C.constant(value=[[0.5, 0.5, 0.5, 0.5, 0.5]], name='alpha')
-    model = C.param_relu(alpha, data)
+    x_data = np.asarray([[-1, -0.5, 0, 1, 2]], dtype=dtype)
+    x = C.constant(value=x_data, dtype=dtype)
+    alpha_data = np.asarray([[0.5, 0.5, 0.5, 0.5, 0.5]], dtype=dtype)
+    alpha = C.constant(value=alpha_data, dtype=dtype)
+    model = C.param_relu(alpha, x)
     verify_no_input(model, tmpdir, 'PRelu_0')
 
     # one input
-    data = np.asarray([[-1, -0.5, 0, 1, 2]])
-    x = C.input_variable(data.shape)
-    alpha = C.constant(value=[[0.5, 0.5, 0.5, 0.5, 0.5]], name='alpha')
+    x = C.input_variable(x_data.shape, dtype=dtype)
     model = C.param_relu(alpha, x)
-    verify_one_input(model, data, tmpdir, 'PRelu_1')
+    verify_one_input(model, x_data, tmpdir, 'PRelu_1')
+
+    # two input
+    x = C.input_variable(x_data.shape, dtype=dtype)
+    alpha = C.input_variable(alpha_data.shape, dtype=dtype)
+    model = C.param_relu(alpha, x)
+    verify_two_input(model, alpha_data, x_data, tmpdir, 'PRelu_2')
 
 #Pow
 @pytest.mark.parametrize("dtype", DType_Config)
